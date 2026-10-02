@@ -37,7 +37,9 @@ jobs:
           npm test
           npm pack --pack-destination ../../dist
       - name: Build canonical Agent Server source image
-        run: uv run python -m openhands.agent_server.docker.build --target source-minimal --platforms linux/amd64 --load --image codex-oauth-validation --custom-tags codex-oauth-validation:test --install-acp-providers codex --install-capabilities ''
+        run: |
+          uv run python -m openhands.agent_server.docker.build --target source-minimal --platforms linux/amd64 --load --image codex-oauth-validation --custom-tags test --install-acp-providers codex --install-capabilities ''
+          docker tag "codex-oauth-validation:${GITHUB_SHA:0:7}-python-node-runtime-source-minimal" codex-oauth-validation:test
       - name: Container and remote HTTP acceptance
         run: uv run python scripts/codex_candidate_acceptance.py
       - name: Package manifest
