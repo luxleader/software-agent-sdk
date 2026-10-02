@@ -20,7 +20,7 @@ async def start(self):
     )
 
 
-async def poll(self, challenge):
+async def poll(self, _challenge):
     self.fixture_polls += 1
     if self.fixture_polls == 1:
         return None
@@ -33,7 +33,7 @@ async def poll(self, challenge):
     }
 
 
-async def refresh(self, refresh_token):
+async def refresh(_self, _refresh_token):
     return {
         "id_token": jwt(
             {"https://api.openai.com/auth": {"chatgpt_account_id": "fixture"}}
