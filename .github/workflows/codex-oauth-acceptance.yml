@@ -1,0 +1,55 @@
+name: Codex OAuth candidate acceptance
+on:
+  push:
+    branches: [validation/codex-oauth-17372-5ab913ac]
+permissions:
+  contents: read
+jobs:
+  linux-docker:
+    if: github.repository == 'luxleader/software-agent-sdk'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      OH_DISABLE_TELEMETRY: 'true'
+      OPENHANDS_SUPPRESS_BANNER: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+        with:
+          version: '0.12.15'
+          python-version: '3.13'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install locked workspace
+        run: uv sync --frozen --group dev
+      - name: Backend and ACP regressions on Linux
+        run: |
+          mkdir -p acceptance-results
+          uv run pytest tests/agent_server/test_codex_auth.py tests/agent_server/test_llm_router.py tests/agent_server/test_credential_binding.py tests/cross/test_remote_conversation_live_server.py::test_codex_device_login_over_authenticated_http tests/sdk/agent/test_acp_agent.py tests/sdk/agent/test_acp_file_credentials.py tests/sdk/agent/test_acp_windows_launch.py tests/sdk/agent/test_acp_dedup_and_truncation.py tests/sdk/agent/test_acp_tracing.py --junitxml=acceptance-results/backend.xml -q
+      - name: Build all candidate Python packages
+        run: uv build --all-packages
+      - name: TypeScript candidate build and tests
+        working-directory: clients/typescript
+        run: |
+          npm ci
+          npm run build
+          npm test
+          npm pack --pack-destination ../../dist
+      - name: Build canonical Agent Server source image
+        run: uv run python -m openhands.agent_server.docker.build --target source-minimal --platforms linux/amd64 --load --image codex-oauth-validation --custom-tags codex-oauth-validation:test --install-acp-providers codex --install-capabilities ''
+      - name: Container and remote HTTP acceptance
+        run: uv run python scripts/codex_candidate_acceptance.py
+      - name: Package manifest
+        if: success()
+        run: |
+          sha256sum dist/* > dist/SHA256SUMS
+          cp acceptance-results/container.json dist/ACCEPTANCE.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: codex-oauth-17372-candidate
+          path: |
+            acceptance-results/
+            dist/
+          retention-days: 14
